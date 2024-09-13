@@ -24,7 +24,7 @@ extension CodableType {
 
 enum GetNewsEndpoint {
     
-    case getNews(pageIndex: Int)
+    case getNews(pageIndex: Int, count: Int)
     case getNewsByID(id: Int)
     case getNewsCommentByID(id: Int)
 //    case postCommentByID
@@ -47,8 +47,8 @@ extension GetNewsEndpoint: NewsRouting {
         
         switch self {
             
-        case .getNews(let pageIndex):
-            return "/news/?page_index=\(pageIndex)&page_size=100"
+        case .getNews(let pageIndex, let count):
+            return "/news/?page_index=\(pageIndex)&page_size=\(count)"
             
         case .getNewsByID(id: let id):
             return "/news/\(id)"

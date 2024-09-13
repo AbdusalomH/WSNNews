@@ -15,6 +15,8 @@ protocol FeedCellDelegate: AnyObject {
 
 
 final class FeedCell: UICollectionViewCell {
+    
+    var viewModel = FeedModelView()
 
     weak var getNextNews: GetNextNewsDelegate?
     
@@ -22,7 +24,7 @@ final class FeedCell: UICollectionViewCell {
     
     static let reuseID = "feedListCell"
     
-    var receivedNewsModel: [NewsModel] = []
+    var receivedNewsModel: [NewsModel] = [] 
  
     
     lazy var feedsTable: UITableView = {
@@ -35,12 +37,24 @@ final class FeedCell: UICollectionViewCell {
         return table
     }()
     
-    
+    let refreshControl = UIRefreshControl()
+
     override init(frame: CGRect) {
         super.init(frame: frame)
+        setupView()
+        setupViewModel()
+    }
+   
+    
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+    
+    
+    private func setupView() {
         backgroundColor = .black
         contentView.backgroundColor = .black
-
+        
         contentView.addSubview(feedsTable)
         
         NSLayoutConstraint.activate([
@@ -49,17 +63,23 @@ final class FeedCell: UICollectionViewCell {
             feedsTable.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
             feedsTable.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -50)
         ])
+        feedsTable.refreshControl = refreshControl
+        refreshControl.tintColor = .white
+        refreshControl.addTarget(self, action: #selector(refreshMe), for: .valueChanged)
+        refreshControl.attributedTitle = NSAttributedString(string: "loading...")
     }
     
     
-    
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
+    @objc func refreshMe() {
+       print("refreshMe")
+       self.feedsTable.refreshControl?.endRefreshing()
+       self.feedsTable.reloadData()
     }
     
     
     func setupData(name: String, newsData: [NewsModel]) {
         receivedNewsModel = newsData
+        feedsTable.reloadData()
     }
     
     
@@ -67,6 +87,7 @@ final class FeedCell: UICollectionViewCell {
         feedsTable.reloadData()
     }
 }
+
 
 extension FeedCell: UITableViewDataSource, UITableViewDelegate {
     
@@ -83,7 +104,6 @@ extension FeedCell: UITableViewDataSource, UITableViewDelegate {
     
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: FeedDetailsCell.reuseID, for: indexPath) as! FeedDetailsCell
-        
         cell.setupFeedData(datas: receivedNewsModel[indexPath.row])
         cell.addMark.tag = indexPath.row
         cell.addMark.addTarget(self, action: #selector(addNewItem(sender:)), for: .touchUpInside)
@@ -104,5 +124,17 @@ extension FeedCell: UITableViewDataSource, UITableViewDelegate {
         if offsetY > contentHeight - height{
             getNextNews?.getNextNews()
         }
+    }
+    
+    
+    private func setupViewModel() {
+        // Подписка на обновления данных
+        NotificationCenter.default.addObserver(self, selector: #selector(handleNewsUpdate), name: .newsUpdated, object: nil)
+    }
+    
+    
+    @objc private func handleNewsUpdate(notification: Notification) {
+        // Обновление таблицы после получения новостей
+        feedsTable.reloadData()
     }
 }

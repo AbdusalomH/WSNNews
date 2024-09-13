@@ -11,42 +11,47 @@ import Alamofire
 typealias NewsNetWorkRouterCompletion<T> = ((AFDataResponse<T>) -> Void) where T : Decodable
 
 
-
 protocol NewsNetworkRouter: AnyObject {
     
     associatedtype Endpoint: NewsRouting
     associatedtype ParseData: Decodable
     
-    func newsRequest(_ route: Endpoint, completion: @escaping NewsNetWorkRouterCompletion<ParseData>)
+ //   func newsRequest(_ route: Endpoint, completion: @escaping NewsNetWorkRouterCompletion<ParseData>)
     
+    func feedRequest(_ route: Endpoint) async throws -> ParseData
+
 }
 
 //создаем final class  который реализует сам запрос
 final class NewsNetRouter<Endpoint: NewsRouting, ParseData: Decodable>: NewsNetworkRouter {
     
-    
-    //
-    //    func newsRequest(_ route: Endpoint, completion: @escaping NewsNetWorkRouterCompletion<ParseData>) {
-    //        print(route.baseURL)
-    //
-    //        AF.request(route.baseUrlWithPath, method: route.method, parameters: route.parameters, headers: route.headers).responseDecodable(of: ParseData.self, completionHandler: completion)
-    //    }
-    
-    
-    func newsRequest(_ route: Endpoint, completion: @escaping NewsNetWorkRouterCompletion<ParseData>) {
+    func feedRequest(_ route: Endpoint) async throws -> ParseData {
         
-        AF.request(route.baseUrlWithPath, method: route.method, parameters: route.parameters, headers: route.headers)
-            .validate() // Добавим валидацию, чтобы отлавливать HTTP ошибки
-            .responseDecodable(of: ParseData.self) { response in
+        return try await withCheckedThrowingContinuation { contunation in
+            
+            AF.request(route.baseUrlWithPath, method: route.method, parameters: route.parameters, headers: route.headers).responseDecodable(of: ParseData.self) { response in
+                
+                
                 switch response.result {
-                case .success(let data):
-                    completion(response)
+                    
+                case .success(let success):
+                    contunation.resume(returning: success)
                 case .failure(let error):
-                    print("Request failed with error: \(error)")
-                    print("Response data: \(String(describing: response.data))")
-                    completion(response)
+                    contunation.resume(throwing: error as AFError)
                 }
             }
+        }
     }
+    
+    
+//
+//    
+//    func newsRequest(_ route: Endpoint, completion: @escaping NewsNetWorkRouterCompletion<ParseData>) {
+//    
+//            AF.request(route.baseUrlWithPath, method: route.method, parameters: route.parameters, headers: route.headers).responseDecodable(of: ParseData.self, completionHandler: completion)
+//    }
 }
+
+
+
 

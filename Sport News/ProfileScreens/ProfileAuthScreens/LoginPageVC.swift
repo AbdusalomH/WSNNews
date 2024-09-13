@@ -14,7 +14,43 @@ enum LoginState: Int {
 }
 
 
-class LoginPageVC: UIViewController {
+class LoginPageVC: UIViewController, LogingViewModelDelegate {
+    
+    
+    let viewModel = AuthViewModel()
+    
+    
+    func didLoginSuccessfully() {
+         self.loginLabel.isHidden = true
+         self.dismiss(animated: true)
+         self.delegate?.loginPageVCDidClose()
+         self.profileCoordinator?.start()
+         self.activityIndicator.stopAnimating()
+         self.activityIndicator.removeFromSuperview()
+    }
+    
+    
+    func didFailLogin() {
+        
+        UIView.animate(withDuration: 3, delay: 0.3, usingSpringWithDamping: .infinity, initialSpringVelocity: .greatestFiniteMagnitude) {
+            self.errorLabel.isHidden = false
+        }
+        self.activityIndicator.stopAnimating()
+        self.activityIndicator.removeFromSuperview()
+    }
+    
+    lazy var errorLabel: UILabel = {
+        let label = UILabel()
+        label.translatesAutoresizingMaskIntoConstraints = false
+        label.textAlignment = .left
+        label.font = UIFont.systemFont(ofSize: 14, weight: .semibold)
+        label.textColor = .red
+        label.numberOfLines = 0
+        label.text = "You email or password is incorrect!"
+        label.isHidden = true
+        return label
+    }()
+    
     
     weak var delegate: LoginPageVCDelegate?
     
@@ -25,7 +61,7 @@ class LoginPageVC: UIViewController {
     let activityIndicator = UIActivityIndicatorView(style: .medium)
     
     
-    let network = AuthNetworkManager()
+    let network = AuthsNetworkManager()
     
  
     var state: LoginState = .signIn {
@@ -377,6 +413,7 @@ class LoginPageVC: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         setupView()
+        viewModel.delegate = self
     }
 
     
@@ -396,47 +433,13 @@ class LoginPageVC: UIViewController {
     
     @objc func sigInButtonTapped() {
         activityIndicatior()
-        
-        guard let loginEmail = loginEmailTextField.text, !loginEmail.isEmpty,
-              let loginPassword = loginPasswordTextField.text, !loginPassword.isEmpty else {
+        guard let email = loginEmailTextField.text, let passsword = loginPasswordTextField.text, !email.isEmpty, !passsword.isEmpty else {
+            activityIndicator.stopAnimating()
+            activityIndicator.removeFromSuperview()
+            presentWSNAlertOnMainThread(title: "Warning", message: "Something went wrong", actionTitle: "OK")
             return
         }
-//        
-//        NetworkManager.shared.signIn(email: loginEmail, password: loginPassword) { result in
-//            
-//            switch result {
-//                
-//            case .success(let success):
-//                KeychainManager.shared.saveUserInfo(username: success.profile.username, email: success.profile.email)
-//                KeychainManager.shared.saveToken(accessToken: success.access_token)
-//                KeychainManager.shared.saveRefreshToken(refreshToken: success.refresh_token)
-//                DispatchQueue.main.async {
-//                    self.dismiss(animated: true)
-//                    self.delegate?.loginPageVCDidClose()
-//                    self.profileCoordinator?.start()
-//                    self.activityIndicator.stopAnimating()
-//                    self.activityIndicator.removeFromSuperview()
-//                }
-//            case .failure(let error):
-//                print(error)
-//            }
-//        }
-        
-        network.loginFetch(email: loginEmail, password: loginPassword) {authmodel, error in
-            
-            guard let receivedData = authmodel else { return }
-            
-            KeychainManager.shared.saveUserInfo(username: receivedData.profile.username, email: receivedData.profile.email)
-            KeychainManager.shared.saveToken(accessToken: receivedData.access_token)
-            KeychainManager.shared.saveRefreshToken(refreshToken: receivedData.refresh_token)
-            DispatchQueue.main.async {
-                self.dismiss(animated: true)
-                self.delegate?.loginPageVCDidClose()
-                self.profileCoordinator?.start()
-                self.activityIndicator.stopAnimating()
-                self.activityIndicator.removeFromSuperview()
-            }
-        }
+        viewModel.login(email: email, password: passsword)
     }
     
     
@@ -446,59 +449,21 @@ class LoginPageVC: UIViewController {
         guard let username = signUpUsername.text, !username.isEmpty,
               let email = emailsignup.text, !email.isEmpty,
               let password = passwordSignUp.text, !password.isEmpty else {
-            print("поля не полные")
-            // Вывод сообщения об ошибке или возвращение из функции, если какое-то поле не заполнено
+            presentWSNAlertOnMainThread(title: "Warning", message: "Something went wrong", actionTitle: "OK")
+
             return
         }
         
         if passwordSignUp.text != againPasswordSignUp.text {
-            presentWSNAlertOnMainThread(title: "Warning!", message: "Unable to complete request, your passwords doesn't match. Unable to complete request, your passwords doesn't match", actionTitle: "OK")
+            presentWSNAlertOnMainThread(title: "Warning!", message: "Unable to complete request, your passwords doesn't match.", actionTitle: "OK")
             DispatchQueue.main.async {
                 self.activityIndicator.stopAnimating()
                 self.activityIndicator.removeFromSuperview()
             }
             return
         }
-        
-//        NetworkManager.shared.signUp(username: username, email: email, password: password, country: "") { result in
-//            
-//            switch result {
-//                
-//            case .success(let success):
-//                
-//                KeychainManager.shared.saveToken(accessToken: success.access_token)
-//                KeychainManager.shared.saveRefreshToken(refreshToken: success.refresh_token)
-//                KeychainManager.shared.saveUserInfo(username: username, email: email)
-//                
-//                DispatchQueue.main.async {
-//                    self.dismiss(animated: true)
-//                    self.delegate?.loginPageVCDidClose()
-//                    self.profileCoordinator?.start()
-//                    self.activityIndicator.stopAnimating()
-//                    self.activityIndicator.removeFromSuperview()
-//                }
-//                
-//                
-//            case .failure(let failure):
-//                print(failure)
-//            }
-//        }
-        
-        network.signUpFetch(username: username, email: email, password: password) { [ weak self ] authmodel, error in
-            
-            guard let receivedData = authmodel else {return}
-            KeychainManager.shared.saveToken(accessToken: receivedData.access_token)
-            KeychainManager.shared.saveRefreshToken(refreshToken: receivedData.refresh_token)
-            KeychainManager.shared.saveUserInfo(username: receivedData.profile.username, email: receivedData.profile.email)
-            
-            DispatchQueue.main.async {
-                self?.dismiss(animated: true)
-                self?.delegate?.loginPageVCDidClose()
-                self?.profileCoordinator?.start()
-                self?.activityIndicator.stopAnimating()
-                self?.activityIndicator.removeFromSuperview()
-            }
-        }
+
+        viewModel.signUp(username: username, email: email, password: password)
     }
     
     
@@ -561,6 +526,9 @@ class LoginPageVC: UIViewController {
         view.addSubview(signUpPasswrdPlaceHolder)
         view.addSubview(signUpAgainPasswrdPlaceHolder)
         view.addSubview(signUpuserNamePlaceholder)
+        
+        //add loging error label
+        view.addSubview(errorLabel)
         
         
         NSLayoutConstraint.activate([
@@ -657,7 +625,12 @@ class LoginPageVC: UIViewController {
             signUpButton.topAnchor.constraint(equalTo: againPasswordSignUp.bottomAnchor, constant: 30),
             signUpButton.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
             signUpButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
-            signUpButton.heightAnchor.constraint(equalToConstant: 60)
+            signUpButton.heightAnchor.constraint(equalToConstant: 60),
+            
+            errorLabel.topAnchor.constraint(equalTo: uisegment.bottomAnchor, constant: 8),
+            errorLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 12),
+            errorLabel.bottomAnchor.constraint(equalTo: loginEmailTextField.topAnchor, constant: -8),
+            errorLabel.trailingAnchor.constraint(equalTo: uisegment.trailingAnchor)
         ])
     }
     

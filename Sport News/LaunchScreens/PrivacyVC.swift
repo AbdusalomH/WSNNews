@@ -81,6 +81,11 @@ final class PrivacyVC: UIViewController {
         privacyText.delegate = self
     }
     
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        navigationController?.setNavigationBarHidden(true, animated: true)
+    }
+    
     
     private func setup() {
                 

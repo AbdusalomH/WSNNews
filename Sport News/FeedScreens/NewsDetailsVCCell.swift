@@ -84,6 +84,8 @@ class NewsDetailsVCCell: UIViewController {
                 self.feedDetailTable.reloadData()
             }
         }
+        
+        
     }
     
     

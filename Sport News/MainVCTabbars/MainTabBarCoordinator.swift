@@ -53,6 +53,7 @@ class MainTabBarCoordinator: BaseCoordinator {
         
         navigationController.pushViewController(tabBarController, animated: true)
         tabBarController.configureTabBarAppearance()
+ 
     }
 }
 
@@ -60,11 +61,9 @@ class MainTabBarCoordinator: BaseCoordinator {
 extension UITabBarController {
     func configureTabBarAppearance() {
         tabBar.tintColor = .red
-        tabBar.barTintColor = .black
+        tabBar.barTintColor = .white
         tabBar.layer.borderWidth = 0.5
         tabBar.backgroundColor = .black
-        
-        
     }
 }
 

@@ -10,6 +10,7 @@ import Kingfisher
 
 final class FavoritesSelectionCell: UICollectionViewCell {
     
+    
     static let reuseID = "favoriteCell"
     
     
