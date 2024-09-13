@@ -17,19 +17,11 @@ protocol GetNextNewsDelegate: AnyObject {
 
 final class FeedVC: UIViewController {
     
+    var viewModel = FeedModelView()
+    
     var coordinator: FeedCoordinator?
     
     let newsNetwork = NewsNetworkManager()
-    
-    var page = 1
-    
-    var hasMoreNews = true
-    
-    var firstLaunch = true
-        
-    var categoryData: [String] = []
-    
-    var groupedCategory: [String : [NewsModel]] = [:]
         
     let logo = WSNLogo(frame: .zero)
 
@@ -94,80 +86,14 @@ final class FeedVC: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         viewSetup()
-        getNewViaRouter(pageIndex: page)
+        viewModel.getNews(index: viewModel.page)
+        setupViewModel()
     }
-
-    
-    func getNewViaRouter(pageIndex: Int) {
-        
-        if hasMoreNews {
-            feedSkeletonTable.showAnimatedSkeleton(usingColor: .darkGray)
-            categoriesTable.showAnimatedSkeleton(usingColor: .darkGray)
-        }
-        
-        
-        var receivedCategory: Set<String> = []
-        
-        var grouped: [String: [NewsModel]] = [:]
-        
-        
-        newsNetwork.getNews(index: pageIndex) { newsModel, error in
-            
-            guard let newsdata = newsModel else { return }
-            
-            if self.hasMoreNews {
-                for item in newsdata {
-                    let category = item.source.title
-                    if !receivedCategory.contains(category) {
-                        receivedCategory.insert(category)
-                    }
-                    
-                    if grouped[category] == nil {
-                        grouped[category] = []
-                    }
-                    grouped[category]?.append(item)
-                }
-                
-                DispatchQueue.main.async {
-                    self.categoryData = Array(receivedCategory)
-                    if self.categoryData.count < 100 {
-                        
-                    }
-                    for (category, items) in grouped {
-                        if self.groupedCategory[category] == nil {
-                            self.groupedCategory[category] = items
-                        } else {
-                            self.groupedCategory[category]?.append(contentsOf: items)
-                        }
-                    }
-                    //Hide skeleton cross dissolve transition with 0.25 seconds fade time
-                    UIView.animate(withDuration: 0.1) {
-                        self.categoriesTable.stopSkeletonAnimation()
-                        self.categoriesTable.hideSkeleton(transition: .crossDissolve(0.25))
-                        self.feedSkeletonTable.stopSkeletonAnimation()
-                        self.feedSkeletonTable.hideSkeleton(transition: .crossDissolve(0.25))
-                        self.feedSkeletonTable.isHidden = true
-                        self.feedTable.isHidden = false
-                        self.categoriesTable.reloadData()
-                        self.feedTable.reloadData()
-                        
-                    }
-                }
-            }
-            
-            
-            if newsdata.count < 100 {
-                
-                self.hasMoreNews = false
-                
-            }
-        }
-    }
-
 
     func viewSetup() {
         
         view.backgroundColor = .black
+        
         navigationController?.setNavigationBarHidden(true, animated: false)
         
         view.addSubview(titleContainer)
@@ -244,11 +170,14 @@ extension FeedVC: UICollectionViewDelegate, UICollectionViewDataSource, Skeleton
         
         switch collectionView {
         case categoriesTable:
-            return categoryData.count
+            //return categoryData.count
+            return viewModel.groupedCategory.keys.count
         case feedSkeletonTable:
-            return categoryData.count
+            //return categoryData.count
+            return viewModel.groupedCategory.keys.count
         case feedTable:
-            return categoryData.count
+            //return categoryData.count
+            return viewModel.groupedCategory.keys.count
         default:
             break
         }
@@ -272,7 +201,7 @@ extension FeedVC: UICollectionViewDelegate, UICollectionViewDataSource, Skeleton
     // Инициализация простая, для первой ячейки категории сразу ставим выбор как активная
     func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
         
-        let keyArray = Array(groupedCategory.keys)
+        let keyArray = Array(viewModel.groupedCategory.keys)
 
         switch collectionView {
  
@@ -280,12 +209,13 @@ extension FeedVC: UICollectionViewDelegate, UICollectionViewDataSource, Skeleton
         case categoriesTable:
             let cell = collectionView.dequeueReusableCell(withReuseIdentifier: FeedCategoryCell.reuseID, for: indexPath) as! FeedCategoryCell
             let receivedCategory = keyArray[indexPath.row]
+            cell.tag = indexPath.row
            
             cell.setupData(name: receivedCategory)
-            if firstLaunch {
+            if viewModel.firstLaunch {
                 let index = IndexPath(row: 0, section: 0)
                 categoriesTable.selectItem(at: index, animated: true, scrollPosition: .left)
-                firstLaunch.toggle()
+                viewModel.firstLaunch.toggle()
             }
             return cell
            
@@ -294,14 +224,14 @@ extension FeedVC: UICollectionViewDelegate, UICollectionViewDataSource, Skeleton
             let cell = collectionView.dequeueReusableCell(withReuseIdentifier: FeedCell.reuseID, for: indexPath) as! FeedCell
             cell.delegates = self
             cell.getNextNews = self
-            let category = Array(groupedCategory.keys)[indexPath.item]
-            let newsItems = groupedCategory[category] ?? []
+            let category = Array(viewModel.groupedCategory.keys)[indexPath.item]
+            let newsItems = viewModel.groupedCategory[category] ?? []
             cell.setupData(name: category, newsData: newsItems)
             return cell
-            
         default:
             break
         }
+        
         return UICollectionViewCell()
     }
     
@@ -357,8 +287,7 @@ extension FeedVC: FeedCellDelegate, GetNextNewsDelegate  {
     
     
     func getNextNews() {
-        page += 1
-        getNewViaRouter(pageIndex: page)
+        viewModel.page += 1
     }
 }
 
@@ -375,5 +304,28 @@ extension FeedVC: UITableViewDelegate, UITableViewDataSource {
         let cell = tableView.dequeueReusableCell(withIdentifier: FeedDetailsCell.reuseID, for: indexPath) as! FeedDetailsCell
         cell.showAnimatedSkeleton(usingColor: .darkGray)
         return cell
+    }
+    
+    private func setupViewModel() {
+        // Подписка на обновления данных
+        NotificationCenter.default.addObserver(self, selector: #selector(handleNewsUpdate), name: .newsUpdated, object: nil)
+    }
+    
+    @objc private func handleNewsUpdate(notification: Notification) {
+        
+        // Обновление таблицы после получения новостей
+        DispatchQueue.main.async {
+        
+            UIView.animate(withDuration: 0.1) {
+                self.categoriesTable.stopSkeletonAnimation()
+                self.categoriesTable.hideSkeleton(transition: .crossDissolve(0.25))
+                self.feedSkeletonTable.stopSkeletonAnimation()
+                self.feedSkeletonTable.hideSkeleton(transition: .crossDissolve(0.25))
+                self.feedSkeletonTable.isHidden = true
+                self.feedTable.isHidden = false
+                self.categoriesTable.reloadData()
+                self.feedTable.reloadData()
+            }
+        }
     }
 }

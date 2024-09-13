@@ -300,7 +300,6 @@ class ProfileVC: UIViewController, UITableViewDelegate, UITableViewDataSource, U
 
     
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        #warning("количество надо уточнить")
         //return MockDataHere.favoriteList.count
         return 0
     }

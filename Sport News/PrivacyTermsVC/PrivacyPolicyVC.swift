@@ -86,3 +86,5 @@ class PrivacyPolicyVC: UIViewController {
 
     }
 }
+
+

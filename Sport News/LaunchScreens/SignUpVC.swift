@@ -19,7 +19,7 @@ protocol SignUpDelegate: AnyObject {
 
 final class SignUpVC: UIViewController  {
     
-    let authNetwork = AuthNetworkManager()
+    let authNetwork = AuthsNetworkManager()
     
    
     var coordinator: SignUpDelegate?
@@ -101,30 +101,7 @@ final class SignUpVC: UIViewController  {
         self.coordinator?.showLoginVC(state: .signIn)
     }
     
-    
-    @objc func skipMe() {
-        
-        authNetwork.anonymusFetch { [weak self] authmodel, error in
-            
-            guard let registered = authmodel else {
-                self?.presentWSNAlertOnMainThread(title: "Warning!", message: "Please try again later!", actionTitle: "OK")
-                return
-            }
-            
-            DispatchQueue.main.async {
-                KeychainManager.shared.saveToken(accessToken: registered.access_token)
-                KeychainManager.shared.saveRefreshToken(refreshToken: registered.refresh_token)
-                KeychainManager.shared.saveUserInfo(username: registered.profile.username, email: registered.profile.username)
-                
-            }
-            if (error != nil) {
-                self?.presentWSNAlertOnMainThread(title: "Warning!", message: "Please try again later!", actionTitle: "OK")
-            }
-            self?.coordinator?.showPrivacy()
-        }
-        
-    }
-    
+  
     
     private func setupView() {
         
@@ -187,6 +164,26 @@ final class SignUpVC: UIViewController  {
         skipForNow.addTarget(self, action: #selector(skipMe), for: .touchUpInside)
         signIn.addTarget(self, action: #selector(showLogin), for: .touchUpInside)
         signUp.addTarget(self, action: #selector(showSignUp), for: .touchUpInside)
+    }
+    
+    
+    @objc func skipMe() {
+        
+        Task {
+            do {
+                let anonymus = try await AuthsNetworkManager().anonymus()
+                DispatchQueue.main.async {
+                    KeychainManager.shared.saveToken(accessToken: anonymus.access_token)
+                    KeychainManager.shared.saveRefreshToken(refreshToken: anonymus.refresh_token)
+                    KeychainManager.shared.saveUserInfo(username: anonymus.profile.username, email: anonymus.profile.username)
+                }
+                
+                self.coordinator?.showPrivacy()
+            } catch {
+                print("Something went wrond")
+                presentWSNAlertOnMainThread(title: "Warnin", message: "Something went wrong", actionTitle: "OK")
+            }
+        }
     }
 
 }
